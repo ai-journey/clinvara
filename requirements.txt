@@ -1,0 +1,9 @@
+streamlit==1.36.0
+pandas
+numpy
+pydantic
+python-dotenv
+fpdf2         # if you want PDF export
+rapidfuzz     # for text matching / fuzzy logic
+pdfplumber    # for protocol text extraction
+python-multipart

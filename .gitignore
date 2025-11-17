@@ -1,0 +1,8 @@
+__pycache__/
+studies/
+*.pdf
+*.csv
+*.json
+*.pickle
+.env
+.DS_Store
