@@ -7,3 +7,4 @@ fpdf2         # if you want PDF export
 rapidfuzz     # for text matching / fuzzy logic
 pdfplumber    # for protocol text extraction
 python-multipart
+openai
