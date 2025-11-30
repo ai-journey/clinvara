@@ -13,6 +13,21 @@ study_path = st.session_state.study_path
 criteria_dir = os.path.join(study_path, "criteria")
 os.makedirs(criteria_dir, exist_ok=True)
 
+# If user previously set key in session, ensure process env has it so utils can read it
+if st.session_state.get("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = st.session_state.get("OPENAI_API_KEY")
+
+# Small UI to allow pasting an OpenAI API key at runtime (keeps it in session only)
+with st.expander("OpenAI API Key (optional)"):
+    api_key_input = st.text_input("Paste OpenAI API key (sk-...)", type="password", value=st.session_state.get("OPENAI_API_KEY", ""))
+    if st.button("Set API Key", key="set_openai_key"):
+        if api_key_input:
+            st.session_state["OPENAI_API_KEY"] = api_key_input
+            os.environ["OPENAI_API_KEY"] = api_key_input
+            st.success("OpenAI API key set for this session.")
+        else:
+            st.error("Please enter a non-empty key.")
+
 # Extraction options
 use_llm = st.checkbox("Use LLM-based extraction (requires OPENAI_API_KEY)", value=False)
 
