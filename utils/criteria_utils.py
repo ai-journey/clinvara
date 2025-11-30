@@ -7,7 +7,10 @@ logger = logging.getLogger(__name__)
 
 def _clean_line(line: str) -> str:
     """Remove leading bullets, numbers, dashes, etc."""
+    # Remove common PDF garbage bullets
+    line = line.replace('(cid:2)', '').strip()
     return re.sub(r'^[\-\*\u2022\d\)\.\s]+', '', line).strip()
+
 
 
 def _parse_block(block: str, prefix: str) -> List[dict]:
@@ -95,8 +98,34 @@ def extract_criteria_from_text(text: str) -> Tuple[List[dict], List[dict]]:
     exc_block = ""
 
     # Find positions of inclusion and exclusion headings using simple patterns
-    inc_heading = re.search(r'inclusion\s+criteria', text, re.I)
-    exc_heading = re.search(r'exclusion\s+criteria', text, re.I)
+    # We need to be careful to skip Table of Contents entries which often look like:
+    # "5.1 Inclusion Criteria ................................. 25"
+    
+    def find_heading(pattern: str, text: str) -> re.Match:
+        """Find the first occurrence of pattern that doesn't look like a TOC entry."""
+        for match in re.finditer(pattern, text, re.I):
+            # Check the line content
+            line_start = text.rfind('\n', 0, match.start()) + 1
+            line_end = text.find('\n', match.end())
+            if line_end == -1: line_end = len(text)
+            
+            line_content = text[line_start:line_end].strip()
+            
+            # Skip if it looks like a TOC entry (ends with dots and/or number)
+            # e.g. "Inclusion Criteria ... 25" or "Inclusion Criteria 25"
+            if re.search(r'\.{3,}\s*\d+$', line_content):
+                continue
+            if re.search(r'\s+\d+$', line_content) and len(line_content) < 60:
+                 # Short line ending in number might be TOC
+                 # But be careful: "Inclusion Criteria (Section 5)" is valid
+                 # "Inclusion Criteria 25" is likely TOC
+                 pass
+
+            return match
+        return None
+
+    inc_heading = find_heading(r'inclusion\s+criteria', text)
+    exc_heading = find_heading(r'exclusion\s+criteria', text)
 
     def find_line_start(text: str, pos: int) -> int:
         """Find the start of the line containing position pos."""
@@ -125,9 +154,9 @@ def extract_criteria_from_text(text: str) -> Tuple[List[dict], List[dict]]:
             inc_block = text[inc_line_end:].strip()
             
         # Trim blocks at next major section heading (but not numbered criteria items)
-        # Match patterns like "5. Study Procedures" or "STUDY PROCEDURES" but not "1. Age >= 18"
+        # Match patterns like "5. Study Procedures", "5.3 Lifestyle", or "STUDY PROCEDURES"
         section_patterns = [
-            r'\n\s*\d+[\.\)]\s+[A-Z][a-z]+\s+[A-Z][a-z]+',  # "5. Study Procedures" (two+ capitalized words)
+            r'\n\s*(?:\d+\.)+\d*\s+[A-Z][a-z]+\s+[A-Z][a-z]+',  # "5.3 Lifestyle considerations"
             r'\n\s*[A-Z][A-Z\s]{8,}\n',                     # All caps headings with 8+ chars
         ]
         for pattern in section_patterns:
