@@ -1,10 +1,11 @@
 import streamlit as st
 import json
 import os
-from utils import criteria_utils
+from utils.criteria_consensus import extract_all_criteria
 
 st.title("Step 2: Extract Eligibility Criteria")
 
+# Ensure a study is selected
 if not st.session_state.get("current_study"):
     st.error("No study selected. Return to Study Selector.")
     st.stop()
@@ -13,58 +14,60 @@ study_path = st.session_state.study_path
 criteria_dir = os.path.join(study_path, "criteria")
 os.makedirs(criteria_dir, exist_ok=True)
 
-# If user previously set key in session, ensure process env has it so utils can read it
-if st.session_state.get("OPENAI_API_KEY"):
-    os.environ["OPENAI_API_KEY"] = st.session_state.get("OPENAI_API_KEY")
+# -------------------------------------------------------
+# Load protocol and extract criteria using the new pipeline
+# -------------------------------------------------------
 
-# Small UI to allow pasting an OpenAI API key at runtime (keeps it in session only)
-with st.expander("OpenAI API Key (optional)"):
-    api_key_input = st.text_input("Paste OpenAI API key (sk-...)", type="password", value=st.session_state.get("OPENAI_API_KEY", ""))
-    if st.button("Set API Key", key="set_openai_key"):
-        if api_key_input:
-            st.session_state["OPENAI_API_KEY"] = api_key_input
-            os.environ["OPENAI_API_KEY"] = api_key_input
-            st.success("OpenAI API key set for this session.")
-        else:
-            st.error("Please enter a non-empty key.")
+protocol_path = os.path.join(study_path, "protocol.pdf")
 
-# Extraction options
-use_llm = st.checkbox("Use LLM-based extraction (requires OPENAI_API_KEY)", value=False)
+if not os.path.exists(protocol_path):
+    st.error("Protocol file not found in this study directory.")
+    st.stop()
 
-if st.button("Extract Criteria"):
-    st.info("Running criteria extraction…")
-    txt_path = st.session_state.get("protocol_text_path") or os.path.join(study_path, "protocol", "protocol.txt")
-    if not os.path.exists(txt_path):
-        st.error("Protocol text not found. Run 'Extract Text' on the Protocol Upload step first.")
-    else:
-        try:
-            with open(txt_path, "r", encoding="utf-8") as f:
-                text = f.read()
+# Load raw protocol text as best as possible
+try:
+    with open(protocol_path, "rb") as f:
+        raw_bytes = f.read()
+    try:
+        raw_text = raw_bytes.decode("utf-8", errors="ignore")
+    except Exception:
+        raw_text = raw_bytes.decode("latin-1", errors="ignore")
+except Exception as e:
+    st.error(f"Could not read protocol file: {e}")
+    st.stop()
 
-            inclusion, exclusion = criteria_utils.extract_criteria(text, use_llm=use_llm)
+# Run full consensus extractor
+st.subheader("Extracting criteria. This may take a moment...")
+inclusion, exclusion = extract_all_criteria(raw_text, protocol_path)
 
-            json.dump(inclusion, open(os.path.join(criteria_dir, "inclusion.json"), "w"), indent=2)
-            json.dump(exclusion, open(os.path.join(criteria_dir, "exclusion.json"), "w"), indent=2)
-
-            st.success("Criteria extracted and saved to study folder.")
-        except Exception as e:
-            st.error(f"Failed to extract criteria: {e}")
-
-# Table editors
+# Save results
 inc_path = os.path.join(criteria_dir, "inclusion.json")
 exc_path = os.path.join(criteria_dir, "exclusion.json")
 
+json.dump(inclusion, open(inc_path, "w"), indent=2)
+json.dump(exclusion, open(exc_path, "w"), indent=2)
+
+st.success("Eligibility criteria extracted successfully.")
+
+# -------------------------------------------------------
+# Display and allow editing of extracted criteria
+# -------------------------------------------------------
+
+st.subheader("Inclusion Criteria")
 if os.path.exists(inc_path):
-    inclusion = json.load(open(inc_path))
-    st.subheader("Inclusion Criteria")
-    edited = st.data_editor(inclusion)
+    inclusion_loaded = json.load(open(inc_path))
+    edited = st.data_editor(inclusion_loaded, key="inc_editor")
     json.dump(edited, open(inc_path, "w"), indent=2)
 
+st.subheader("Exclusion Criteria")
 if os.path.exists(exc_path):
-    exclusion = json.load(open(exc_path))
-    st.subheader("Exclusion Criteria")
-    edited = st.data_editor(exclusion)
+    exclusion_loaded = json.load(open(exc_path))
+    edited = st.data_editor(exclusion_loaded, key="exc_editor")
     json.dump(edited, open(exc_path, "w"), indent=2)
+
+# -------------------------------------------------------
+# User actions
+# -------------------------------------------------------
 
 if st.button("Lock Criteria"):
     st.session_state["criteria_locked"] = True
