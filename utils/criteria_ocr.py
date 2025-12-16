@@ -1,16 +1,23 @@
 import logging
 import os
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from pdf2image import convert_from_path
 from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-# Try loading PaddleOCR
+# Type-checking friendly import for PaddleOCR
+if TYPE_CHECKING:
+    from paddleocr import PaddleOCR  # pragma: no cover
+else:
+    PaddleOCR = object  # type: ignore
+
+# Try loading PaddleOCR at runtime
 try:
-    from paddleocr import PaddleOCR
+    from paddleocr import PaddleOCR as _RuntimePaddleOCR
     _PADDLE_AVAILABLE = True
 except Exception:
+    _RuntimePaddleOCR = None  # type: ignore
     _PADDLE_AVAILABLE = False
 
 # Try loading EasyOCR as fallback
@@ -30,7 +37,7 @@ def _load_paddle_ocr() -> Optional[PaddleOCR]:
 
     try:
         # Use English only by default
-        ocr = PaddleOCR(use_angle_cls=True, lang="en")
+        ocr = _RuntimePaddleOCR(use_angle_cls=True, lang="en")  # type: ignore
         return ocr
     except Exception as e:
         logger.warning(f"PaddleOCR failed to initialize: {e}")
