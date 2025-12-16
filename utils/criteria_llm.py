@@ -1,9 +1,7 @@
 import logging
-import json
 from typing import List, Tuple
 
 from openai import OpenAI
-from openai.types.responses import ResponseOutput
 
 logger = logging.getLogger(__name__)
 
@@ -85,13 +83,13 @@ def extract_criteria_via_llm(text: str) -> Tuple[List[dict], List[dict]]:
     )
 
     try:
-        result: ResponseOutput = client.responses.parse(
+        result = client.responses.parse(
             model="gpt-4.1-mini",
             input=prompt,
-            response_format=schema
+            response_format=schema,
         )
 
-        data = result.output_parsed
+        data = result.output_parsed  # type: ignore[attr-defined]
         inclusion = data.get("inclusion", [])
         exclusion = data.get("exclusion", [])
 
