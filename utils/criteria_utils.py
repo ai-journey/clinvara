@@ -180,14 +180,28 @@ def extract_criteria_heuristic(text: str) -> Tuple[List[dict], List[dict]]:
 
     inc_block = _extract_block(
         text,
-        start_label=r"inclusion criteria",
-        end_label=r"exclusion criteria"
+        start_label=r"inclusion\s+criteria",
+        end_label=r"(exclusion\s+criteria|exclusion\s+criteria\s+for|inclusion\s+and\s+exclusion\s+criteria|exclusion)"
     )
     exc_block = _extract_block(
         text,
-        start_label=r"exclusion criteria",
-        end_label=r"(lifestyle considerations|study procedures|visit)"
+        start_label=r"exclusion\s+criteria",
+        end_label=r"(lifestyle considerations|study procedures|visit|treatments|trial population)"
     )
+
+    # Fallback: if no clear inclusion/exclusion blocks, look for a broader eligibility section
+    if not inc_block and not exc_block:
+        elig_block = _extract_block(
+            text,
+            start_label=r"(eligibility\s+criteria|eligibility)",
+            end_label=r"(treatments|trial population|study procedures|visit)"
+        )
+        if elig_block:
+            lines = [l for l in elig_block.split("\n") if l.strip()]
+            mid = len(lines) // 2
+            if mid > 0:
+                inc_block = "\n".join(lines[:mid])
+                exc_block = "\n".join(lines[mid:])
 
     inclusion = _parse_block(inc_block, "INC")
     exclusion = _parse_block(exc_block, "EXC")
