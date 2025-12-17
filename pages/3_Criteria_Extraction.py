@@ -18,10 +18,12 @@ os.makedirs(criteria_dir, exist_ok=True)
 # Load protocol and extract criteria using the new pipeline
 # -------------------------------------------------------
 
-protocol_path = os.path.join(study_path, "protocol.pdf")
+# Keep path convention in sync with pages/2_Protocol_Upload.py
+protocol_dir = os.path.join(study_path, "protocol")
+protocol_path = os.path.join(protocol_dir, "protocol.pdf")
 
 if not os.path.exists(protocol_path):
-    st.error("Protocol file not found in this study directory.")
+    st.error("Protocol file not found for this study. Please complete the Protocol Upload step first.")
     st.stop()
 
 # Load raw protocol text as best as possible
